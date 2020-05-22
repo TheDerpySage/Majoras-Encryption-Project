@@ -11,6 +11,7 @@ pip install pycryptodome
 
 HOW TO PLAY
 ===========
+
 server-rsa.py
 -------------
 The server runs by default on port 42069. Server will listen for incoming connections and then wait for commands.
@@ -20,6 +21,7 @@ DATA, accept RSA encrypted AES password, the file, decrypts the file, and then w
 TIME simply returns the current time.
 EXIT to cleanly close a connection.
 Server script will attempt to return to idle on basic socket errors.
+
 client-rsa.py
 -------------
 A cross platform client that will open a file dialogue and allow you to open any file for sending. AES password will be generated at runtime for you to see, but when it is sent it will be encrypted via the servers public key. When sending DATA, after sending the AES encrypted file, the script waits for the OK from the server indicating that it's recieved it all. There is purposely no timeout on this so that the client doesnt disconnect before everything is sent to accomadate larger files. When complete, script loops if you'd like to send something else.
