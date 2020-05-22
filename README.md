@@ -15,11 +15,17 @@ HOW TO PLAY
 server-rsa.py
 -------------
 The server runs by default on port 42069. Server will listen for incoming connections and then wait for commands.
+
 HELO to verify connection, and send our public key.
+
 NAME to set the name of the file. (Requires HELO)
+
 DATA, accept RSA encrypted AES password, the file, decrypts the file, and then writes. When complete, it will send OK. (Requires HELO)
+
 TIME simply returns the current time.
+
 EXIT to cleanly close a connection.
+
 Server script will attempt to return to idle on basic socket errors.
 
 client-rsa.py
