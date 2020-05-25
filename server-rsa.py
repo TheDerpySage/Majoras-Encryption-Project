@@ -21,8 +21,8 @@ def buffered_send(temp: str):
     return f'{len(temp):<{HEADERSIZE}}' + temp
 
 def buffered_recv(s):
-    # Buffered recieve for variable content length
-    print("[~] Buffered reciever started.")
+    # Buffered receive for variable content length
+    print("[~] Buffered receiver started.")
     buffer = ''
     length = 0
     beginning = True
@@ -43,11 +43,11 @@ def buffered_recv(s):
                 data = s.recv(x)
             else : data = s.recv(default_block_size)
             if data == b'':
-                raise socket.error(f"Buffered Recieve didn't work right... Buffer reached {len(buffer)}\n{buffer}")
+                raise socket.error(f"Buffered Receive didn't work right... Buffer reached {len(buffer)}\n{buffer}")
             print(f"[~] {round(((len(buffer)-HEADERSIZE)/length)*100)}%", end="\r")
         buffer += data.decode("utf-8")
         if len(buffer)-HEADERSIZE == length:
-            print(f"[~] 100% Full message recieved.")
+            print(f"[~] 100% Full message received.")
             buffer = buffer[HEADERSIZE:]
             break
     return buffer
