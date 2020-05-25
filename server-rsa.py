@@ -8,9 +8,9 @@ from Crypto.Cipher import AES
 from Crypto import Random
 
 HEADERSIZE = 10
-#HOST = socket.gethostbyname(socket.getfqdn())
-HOST = "192.168.1.12"
+HOST = socket.gethostbyname(socket.getfqdn())
 PORT = 42069
+TIMEOUT = 60
 
 # This returns msg with the HEADER
 # The header is a HEADERSIZE'd string that is then filled with a number, which is interpreted by the client as the length of our message.
@@ -68,10 +68,8 @@ def start():
 
     while True:
         print(f"[+] Awaiting connection...")
-        s.settimeout(None)
         client, address = s.accept()
-        s.settimeout(10)
-        client.settimeout(10)
+        client.settimeout(TIMEOUT)
         print(f"[+] Connection to {address} has been established!")
         name = "received_file.txt"
         verified = False
