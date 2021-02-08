@@ -1,3 +1,5 @@
+# receiver.py is based on this
+
 from datetime import datetime
 import socket
 import base64
@@ -10,7 +12,7 @@ from Crypto import Random
 HEADERSIZE = 10
 HOST = socket.gethostbyname(socket.getfqdn())
 PORT = 42069
-TIMEOUT = 60
+STORAGE_DIR = "./storage/"
 
 # This returns msg with the HEADER
 # The header is a HEADERSIZE'd string that is then filled with a number, which is interpreted by the client as the length of our message.
@@ -43,7 +45,7 @@ def buffered_recv(s):
                 data = s.recv(x)
             else : data = s.recv(default_block_size)
             if data == b'':
-                raise socket.error(f"Buffered Receive didn't work right... Buffer reached {len(buffer)}\n{buffer}")
+                raise socket.error(f"Buffered receive didn't work right... Buffer reached {len(buffer)}\n{buffer}")
             print(f"[~] {round(((len(buffer)-HEADERSIZE)/length)*100)}%", end="\r")
         buffer += data.decode("utf-8")
         if len(buffer)-HEADERSIZE == length:
@@ -68,18 +70,21 @@ def start():
 
     while True:
         print(f"[+] Awaiting connection...")
+        s.settimeout(None)
         client, address = s.accept()
-        client.settimeout(TIMEOUT)
+        s.settimeout(10)
+        client.settimeout(10)
         print(f"[+] Connection to {address} has been established!")
         name = "received_file.txt"
         verified = False
         try:
+            client.send(bytes("220 MOSHI MOSHI LILY DESU","utf-8"))
             while True:
                 data = client.recv(4)
                 data = data.decode("utf-8")
                 if data == "HELO":
                     # HELO to verify connection, and send our public key.
-                    print("[+] HELO recieved, sending public key.")
+                    print("[+] HELO received, sending public key.")
                     client.send(bytes(buffered_send(public_key.exportKey().decode("utf-8")),"utf-8"))
                     verified = True
                 elif data == "NAME" and verified:
@@ -88,10 +93,10 @@ def start():
                     encrypted = base64.b64decode(buffer.encode())
                     decrypted = cipher.decrypt(encrypted)
                     name = decrypted.decode("utf-8")
-                    print(f"[+] NAME recieved, setting new file name to {name}.")
+                    print(f"[+] NAME received, setting new file name to {name}.")
                 elif data == "DATA" and verified:
                     # DATA, accept RSA encrypted AES password, Decrypt the file, and then write. 
-                    print("[+] DATA recieved...")
+                    print("[+] DATA received...")
                     print("[~] Accepting AES key...")
                     buffer = buffered_recv(client)
                     encrypted = base64.b64decode(buffer.encode())
@@ -106,19 +111,19 @@ def start():
                     aes_cipher = AES.new(aes_key, AES.MODE_CBC, iv)
                     plaintext = aes_cipher.decrypt(ciphertext[AES.block_size:])
                     decrypted = plaintext.rstrip(b"\0")
-                    print(f"[~] Writing to ./received/{name}...")
-                    with open(f'./received/{name}', 'wb') as fileout:
+                    print(f"[~] Writing to {STORAGE_DIR}{name}...")
+                    with open(f'{STORAGE_DIR}{name}', 'wb') as fileout:
                         fileout.write(decrypted)
                         fileout.close()
                     print("[~] Complete! Sending OK.")
                     client.send(bytes("OK","utf-8"))    
                 elif data == "TIME":
                     # TIME simply returns the current time
-                    print(f"[+] TIME recieved, ding dong! The time is {now()}!")
+                    print(f"[+] TIME received, ding dong! The time is {now()}!")
                     client.send(bytes(buffered_send(f"The time is {now()}!"),"utf-8")) 
                 elif data == "EXIT":
                     # EXIT to cleanly close a connection
-                    print("[+] EXIT recieved, closing connection.")
+                    print("[+] EXIT received, closing connection.")
                     client.close()
                     break
                 else:
