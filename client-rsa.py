@@ -19,31 +19,23 @@ def buffered_recv(s):
     # Buffered receive for variable content length
     print("[~] Buffered receiver started.")
     buffer = ''
-    length = 0
-    beginning = True
-    default_block_size = 64
+    default_block_size = 1024
+    try: length = int(s.recv(HEADERSIZE))
+    except:
+        print("[!] Error! Header Invalid! Are you sure we should be buffering? Will attempt to continue...")
+        length = 0
     while True:
-        if beginning:
-            data = s.recv(default_block_size)
-            if len(buffer) > HEADERSIZE:
-                try:
-                    length = int(buffer[:HEADERSIZE])
-                    print(f"[~] Data length: {length}")
-                except:
-                    print("[!] Error! Header Invalid! Are you sure we should be buffering?")
-                beginning = False
-        else:
-            x = length + HEADERSIZE - len(buffer)
-            if x < default_block_size:
-                data = s.recv(x)
-            else : data = s.recv(default_block_size)
-            if data == b'':
-                raise socket.error(f"Buffered receive didn't work right... Buffer reached {len(buffer)}\n{buffer}")
-            #print(f"[~] {round(((len(buffer)-HEADERSIZE)/length)*100)}%", end="\r")
+        print(f"[~] Data length: {length}")
+        x = length - len(buffer)
+        if x < default_block_size:
+            data = s.recv(x)
+        else : data = s.recv(default_block_size)
+        if data == b'':
+            raise socket.error(f"Buffered receive didn't work right... Buffer reached {len(buffer)}\n{buffer}")
         buffer += data.decode("utf-8")
-        if len(buffer)-HEADERSIZE == length:
+        print(f"[~] {round((len(buffer)/length)*100)}%", end="\r")
+        if len(buffer) == length:
             print(f"[~] 100% Full message received.")
-            buffer = buffer[HEADERSIZE:]
             break
     return buffer
 
@@ -82,7 +74,7 @@ def start():
         greeting = s.recv(25).decode("utf-8")
         print("[~] %s" % greeting)
         if greeting == "220 MOSHI MOSHI LILY DESU":
-            print("[+] Banner OK, Sending HELO192 and ready to receive public key.")
+            print("[+] Banner OK, Sending HELO and ready to receive public key..")
             s.send(bytes("HELO","utf-8"))
             public_key = buffered_recv(s)
             print("[+] Received public key, making cipher.")
@@ -114,11 +106,19 @@ def start():
                 iv = Random.new().read(AES.block_size)
                 aes_cipher = AES.new(aes_key, AES.MODE_CBC, iv)
                 ciphertext = iv + aes_cipher.encrypt(plaintext) 
-                print(f"[+] Sending NAME, {FILENAME}.")
-                s.send(bytes("NAME","utf-8"))
-                enc_filename = rsa_cipher.encrypt(bytes(FILENAME,"utf-8"))
-                encrypted64 = base64.b64encode(enc_filename).decode()
-                s.send(bytes(buffered_send(encrypted64),"utf-8"))
+                while (True):
+                    print(f"[+] Sending NAME, {FILENAME}.")
+                    s.send(bytes("NAME","utf-8"))
+                    enc_filename = rsa_cipher.encrypt(bytes(FILENAME,"utf-8"))
+                    encrypted64 = base64.b64encode(enc_filename).decode()
+                    s.send(bytes(buffered_send(encrypted64),"utf-8"))
+                    break
+                    """
+                    POSSIBLE WAY TO MITIGATE DUPE FILENAMES
+                    data = s.recv(2).decode("utf-8")
+                    if data == "NO": FILENAME = input("Server says name is in use, enter a different one: ")
+                    elif data == "OK": break
+                    """
                 print("[+] Sending DATA...")
                 s.send(bytes("DATA","utf-8"))
                 print("[+] Encrypting the AES Password and Sending...") 
@@ -129,18 +129,18 @@ def start():
                 encrypted64 = base64.b64encode(ciphertext).decode()
                 s.send(bytes(buffered_send(encrypted64),"utf-8"))
                 print("[~] Please wait warmly...") 
-                data = s.recv(2)
-                data = data.decode("utf-8")
+                s.settimeout(None)
+                data = s.recv(2).decode("utf-8")
                 if data == "OK":
                     print("[+] Server OK.") 
                 replay=input("[?] Send something else? (y/N): ").lower()
                 if replay != 'y':
                     break
                 else: print("\n")
+                s.settimeout(TIMEOUT)
             print("[+] Sending EXIT, and exiting...")
             s.send(bytes("EXIT","utf-8"))
             print("[+] Exited.")
-            input("Please press any key to exit...")
         else: 
             print("[!] This isn't Lily, exting...")
             s.close()

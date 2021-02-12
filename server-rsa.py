@@ -26,31 +26,22 @@ def buffered_recv(s):
     # Buffered receive for variable content length
     print("[~] Buffered receiver started.")
     buffer = ''
-    length = 0
-    beginning = True
-    default_block_size = 64
+    default_block_size = 1024
+    try: length = int(s.recv(HEADERSIZE))
+    except:
+        raise socket.error("[!] Error on buffered_recv! Header Invalid!")
     while True:
-        if beginning:
-            data = s.recv(default_block_size)
-            if len(buffer) >= HEADERSIZE:
-                try:
-                    length = int(buffer[:HEADERSIZE])
-                    print(f"[~] Data length: {length}")
-                except:
-                    print("[!] Error! Header Invalid! Are you sure we should be buffering?")
-                beginning = False
-        else:
-            x = length + HEADERSIZE - len(buffer)
-            if x < default_block_size:
-                data = s.recv(x)
-            else : data = s.recv(default_block_size)
-            if data == b'':
-                raise socket.error(f"Buffered receive didn't work right... Buffer reached {len(buffer)}\n{buffer}")
-            print(f"[~] {round(((len(buffer)-HEADERSIZE)/length)*100)}%", end="\r")
+        print(f"[~] Data length: {length}")
+        x = length - len(buffer)
+        if x < default_block_size:
+            data = s.recv(x)
+        else : data = s.recv(default_block_size)
+        if data == b'':
+            raise socket.error(f"Buffered receive didn't work right... Buffer reached {len(buffer)}\n{buffer}")
         buffer += data.decode("utf-8")
-        if len(buffer)-HEADERSIZE == length:
+        print(f"[~] {round((len(buffer)/length)*100)}%", end="\r")
+        if len(buffer) == length:
             print(f"[~] 100% Full message received.")
-            buffer = buffer[HEADERSIZE:]
             break
     return buffer
 
@@ -80,8 +71,7 @@ def start():
         try:
             client.send(bytes("220 MOSHI MOSHI LILY DESU","utf-8"))
             while True:
-                data = client.recv(4)
-                data = data.decode("utf-8")
+                data = client.recv(4).decode("utf-8")
                 if data == "HELO":
                     # HELO to verify connection, and send our public key.
                     print("[+] HELO received, sending public key.")
@@ -118,9 +108,9 @@ def start():
                     print("[~] Complete! Sending OK.")
                     client.send(bytes("OK","utf-8"))    
                 elif data == "TIME":
-                    # TIME simply returns the current time
+                    # TIME is server script only, and simply returns the current time
                     print(f"[+] TIME received, ding dong! The time is {now()}!")
-                    client.send(bytes(buffered_send(f"The time is {now()}!"),"utf-8")) 
+                    client.send(bytes(buffered_send(f"The time is {now()}!"),"utf-8"))
                 elif data == "EXIT":
                     # EXIT to cleanly close a connection
                     print("[+] EXIT received, closing connection.")
