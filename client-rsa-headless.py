@@ -1,9 +1,11 @@
-import os, string, socket, base64, hashlib, gzip
-from tkinter.filedialog import askopenfilename
+import os, string, sys, socket, base64, hashlib, gzip
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 from Crypto.Cipher import AES
 from Crypto import Random
+
+# Run with commandline arguments HOST, PORT, and FILEPATHS
+# client-rsa-headless.py 192.168.1.2 42069 test.txt test2.txt etc
 
 HEADERSIZE = 10
 TIMEOUT = 60
@@ -41,14 +43,7 @@ def randomString(stringLength=8):
     letters += string.digits
     return ''.join(Random.random.choice(letters) for i in range(stringLength))
 
-def start():
-    HOST = input("Enter host address: ")
-    if HOST == "":
-        print("[!] Host cannot be empty, exiting...")
-        exit()
-    PORT = input("Enter port [42069]: ")
-    if PORT == "":
-        PORT = 42069
+def start(HOST, PORT, FILEPATHS):
 
     # AES Password is generated at runtime.
     AES_PASSWORD = randomString(16)
@@ -70,16 +65,13 @@ def start():
         greeting = s.recv(25).decode("utf-8")
         print("[~] %s" % greeting)
         if greeting == "220 MOSHI MOSHI LILY DESU":
-            print("[+] Banner OK, Sending HELO and ready to receive public key..")
+            print("[+] Banned OK, Sending HELO and ready to receive public key.")
             s.send(bytes("HELO","utf-8"))
             public_key = buffered_recv(s)
             print("[+] Received public key, making cipher.")
             public_key = RSA.importKey(public_key)
             rsa_cipher = PKCS1_OAEP.new(public_key)
-            while True:    
-                print("[+] Opening file dialogue...")    
-                FILEPATH = askopenfilename(initialdir = ".", title = "Select a file.")
-                # Quick check for a Bad Path
+            for FILEPATH in FILEPATHS:
                 try:
                     infile = open(FILEPATH, 'rb')
                     infile.read()
@@ -103,19 +95,11 @@ def start():
                 iv = Random.new().read(AES.block_size)
                 aes_cipher = AES.new(aes_key, AES.MODE_CBC, iv)
                 ciphertext = iv + aes_cipher.encrypt(plaintext) 
-                while (True):
-                    print(f"[+] Sending NAME, {FILENAME}.")
-                    s.send(bytes("NAME","utf-8"))
-                    enc_filename = rsa_cipher.encrypt(bytes(FILENAME,"utf-8"))
-                    encrypted64 = base64.b64encode(enc_filename).decode()
-                    s.send(bytes(buffered_send(encrypted64),"utf-8"))
-                    break
-                    """
-                    POSSIBLE WAY TO MITIGATE DUPE FILENAMES
-                    data = s.recv(2).decode("utf-8")
-                    if data == "NO": FILENAME = input("Server says name is in use, enter a different one: ")
-                    elif data == "OK": break
-                    """
+                print(f"[+] Sending NAME, {FILENAME}.")
+                s.send(bytes("NAME","utf-8"))
+                enc_filename = rsa_cipher.encrypt(bytes(FILENAME,"utf-8"))
+                encrypted64 = base64.b64encode(enc_filename).decode()
+                s.send(bytes(buffered_send(encrypted64),"utf-8"))
                 print("[+] Sending DATA...")
                 s.send(bytes("DATA","utf-8"))
                 print("[+] Encrypting the AES Password and Sending...") 
@@ -126,26 +110,16 @@ def start():
                 encrypted64 = base64.b64encode(ciphertext).decode()
                 s.send(bytes(buffered_send(encrypted64),"utf-8"))
                 print("[~] Please wait warmly...") 
-                s.settimeout(None)
                 data = s.recv(2).decode("utf-8")
                 if data == "OK":
                     print("[+] Server OK.") 
-                replay=input("[?] Send something else? (y/N): ").lower()
-                if replay != 'y':
-                    break
-                else: print("\n")
-                s.settimeout(TIMEOUT)
             print("[+] Sending EXIT, and exiting...")
             s.send(bytes("EXIT","utf-8"))
             print("[+] Exited.")
-        else: 
-            print("[!] This isn't Lily, exting...")
-            s.close()
-            input("Please press any key to exit...")
-            exit()
+        else:
+            print("[!] Unexpected response, this might not be Lily. Exiting...")
     except Exception as e:
         print(f"[!] Error: {e}")
-        input("Please press any key to exit...")
-        exit()
 
-start()
+FILES = sys.argv[3:]
+start(sys.argv[1], int(sys.argv[2]), FILES)

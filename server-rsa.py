@@ -1,9 +1,7 @@
 # receiver.py is based on this
 
 from datetime import datetime
-import socket
-import base64
-import hashlib
+import socket, base64, hashlib, gzip
 from Crypto.PublicKey import RSA
 from Crypto.Cipher import PKCS1_OAEP
 from Crypto.Cipher import AES
@@ -13,6 +11,8 @@ HEADERSIZE = 10
 HOST = socket.gethostbyname(socket.getfqdn())
 PORT = 42069
 STORAGE_DIR = "./storage/"
+TIMEOUT = 60
+DEFAULT_BLOCK_SIZE = 8192
 
 # This returns msg with the HEADER
 # The header is a HEADERSIZE'd string that is then filled with a number, which is interpreted by the client as the length of our message.
@@ -26,16 +26,15 @@ def buffered_recv(s):
     # Buffered receive for variable content length
     print("[~] Buffered receiver started.")
     buffer = ''
-    default_block_size = 1024
     try: length = int(s.recv(HEADERSIZE))
     except:
         raise socket.error("[!] Error on buffered_recv! Header Invalid!")
+    print(f"[~] Data length: {length}")
     while True:
-        print(f"[~] Data length: {length}")
         x = length - len(buffer)
-        if x < default_block_size:
+        if x < DEFAULT_BLOCK_SIZE:
             data = s.recv(x)
-        else : data = s.recv(default_block_size)
+        else : data = s.recv(DEFAULT_BLOCK_SIZE)
         if data == b'':
             raise socket.error(f"Buffered receive didn't work right... Buffer reached {len(buffer)}\n{buffer}")
         buffer += data.decode("utf-8")
@@ -63,8 +62,8 @@ def start():
         print(f"[+] Awaiting connection...")
         s.settimeout(None)
         client, address = s.accept()
-        s.settimeout(10)
-        client.settimeout(10)
+        s.settimeout(TIMEOUT)
+        client.settimeout(TIMEOUT)
         print(f"[+] Connection to {address} has been established!")
         name = "received_file.txt"
         verified = False
@@ -99,12 +98,12 @@ def start():
                     print("[~] Decrypting file...")
                     iv = ciphertext[:AES.block_size]
                     aes_cipher = AES.new(aes_key, AES.MODE_CBC, iv)
-                    plaintext = aes_cipher.decrypt(ciphertext[AES.block_size:])
-                    decrypted = plaintext.rstrip(b"\0")
+                    decrypted = aes_cipher.decrypt(ciphertext[AES.block_size:])
+                    print(f"[~] Decompressing...")
+                    decrypted = gzip.decompress(decrypted).rstrip(b'\0')
                     print(f"[~] Writing to {STORAGE_DIR}{name}...")
                     with open(f'{STORAGE_DIR}{name}', 'wb') as fileout:
                         fileout.write(decrypted)
-                        fileout.close()
                     print("[~] Complete! Sending OK.")
                     client.send(bytes("OK","utf-8"))    
                 elif data == "TIME":

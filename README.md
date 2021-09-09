@@ -38,6 +38,7 @@ Reasonable restrictions apply (hasn't be tested for over 1GB).
 
 PROOF OF CONCEPT
 ================
+(note: as of the latest commit, the POC is outdated)
 Inside the folder PoC was a packet capture I ran on a file transfer. Included is the file.txt, the packet capture file, and a readme.txt with some of the key packets. The only thing sent in the clear is the Server's public key, after that commands are sent in the clear but the data after those commands are RSA encrypted, and the file itself is AES encrypted.
 
 NOTES
